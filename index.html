@@ -14,6 +14,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&family=Source+Code+Pro:wght@400;700&display=swap" rel="stylesheet">
   
+  <!-- ספריית סריקת קוד QR חיצונית -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  
     <style>
     /* ----------------------------------------------------
        Design System & CSS Variables (Light Theme Palette)
@@ -1599,8 +1602,13 @@
           
           <div class="form-group" style="margin-bottom: 8px;">
             <label for="accSecret">מפתח סודי של גוגל (Base32 Secret):</label>
-            <input type="text" id="accSecret" placeholder="הקלד או הדבק את המפתח הסודי בגוגל..." required pattern="^[a-zA-Z2-7\s=]+$">
-            <span class="input-icon">🔑</span>
+            <div style="display: flex; gap: 8px; align-items: center; position: relative; width: 100%;">
+              <input type="text" id="accSecret" placeholder="הקלד או הדבק את המפתח הסודי בגוגל..." required pattern="^[a-zA-Z2-7\s=]+$" style="flex-grow: 1; padding-right: 40px;">
+              <span class="input-icon" style="bottom: 12px; right: 14px; position: absolute; pointer-events: none;">🔑</span>
+              <button type="button" class="btn-secondary" onclick="openQrScanner()" style="padding: 10px 14px; width: auto; font-size: 13px; white-space: nowrap; flex-shrink: 0;" title="סרוק קוד QR או העלה תמונה">
+                📷 סריקה
+              </button>
+            </div>
           </div>
           
           <div class="form-group" style="margin-bottom: 8px;">
@@ -1786,6 +1794,57 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ==========================================
+       מודל: סורק קוד QR (QR Scanner Modal)
+       ========================================== -->
+  <div class="modal-overlay" id="qrScannerModal" style="display: none; z-index: 2000;">
+    <div class="modal-container glass-panel" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3 class="modal-title">סריקת קוד QR</h3>
+        <button class="modal-close-btn" onclick="closeQrScanner()">✕</button>
+      </div>
+      
+      <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+        <!-- בחירת מקור סריקה -->
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn-submit" id="btnSourceCamera" onclick="switchQrSource('camera')" style="flex: 1; padding: 10px; font-size: 14px; background: var(--color-primary);">
+            📷 מצלמה
+          </button>
+          <button type="button" class="btn-secondary" id="btnSourceFile" onclick="switchQrSource('file')" style="flex: 1; padding: 10px; font-size: 14px;">
+            📁 העלאת תמונה
+          </button>
+        </div>
+
+        <!-- אזור 1: סריקה מהמצלמה -->
+        <div id="qrCameraArea" style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+          <div style="position: relative; width: 100%; max-width: 320px; aspect-ratio: 4/3; background: #000; border-radius: 8px; overflow: hidden; border: 2px solid var(--glass-border);">
+            <video id="qrVideo" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
+            <!-- מלבן כיוון סריקה -->
+            <div style="position: absolute; top: 15%; left: 15%; width: 70%; height: 70%; border: 2px dashed var(--color-primary); border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); text-align: center;">הצב את קוד ה-QR במרכז הריבוע הסורק</div>
+        </div>
+
+        <!-- אזור 2: סריקה מקובץ -->
+        <div id="qrFileArea" style="display: none; flex-direction: column; align-items: center; gap: 15px;">
+          <div id="qrDropZone" style="width: 100%; padding: 30px 20px; border: 2px dashed var(--color-primary); border-radius: 8px; text-align: center; background: rgba(109, 40, 217, 0.02); cursor: pointer; transition: var(--transition-smooth);" onclick="triggerQrFileSelect()">
+            <span style="font-size: 30px;">📂</span>
+            <div style="font-weight: 700; margin-top: 8px; color: var(--text-main);">גרור לכאן צילום מסך או לחץ לבחירת קובץ</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">תומך ב-PNG, JPG, JPEG</div>
+            <input type="file" id="qrFileInput" accept="image/*" style="display: none;" onchange="handleQrFileSelect(event)">
+          </div>
+          <div id="qrFilePreviewContainer" style="display: none; width: 150px; height: 150px; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border);">
+            <img id="qrFilePreview" style="width: 100%; height: 100%; object-fit: contain;">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+          <button type="button" class="btn-secondary" onclick="closeQrScanner()" style="width: auto; padding: 10px 20px;">ביטול</button>
         </div>
       </div>
     </div>
@@ -2179,6 +2238,7 @@
     // בדיקה ראשונית של המצב בעת פתיחת הדף
     window.addEventListener("load", async () => {
       initModalGuideListeners();
+      initQrDropZone();
       showScreen("lockScreen");
       document.getElementById("lockEmail").focus();
       updateSyncBadgeStatus();
@@ -3029,6 +3089,223 @@
       setTimeout(() => {
         window.location.reload();
       }, 1000);
+    }
+
+    // ----------------------------------------------------
+    // סורק קוד QR (QR Code Scanner)
+    // ----------------------------------------------------
+    let qrVideoTrack = null;
+    let qrScannerActive = false;
+
+    function openQrScanner() {
+      document.getElementById("qrScannerModal").classList.add("active");
+      document.getElementById("qrScannerModal").style.display = "flex";
+      switchQrSource('camera');
+    }
+
+    function closeQrScanner() {
+      stopQrCamera();
+      document.getElementById("qrScannerModal").classList.remove("active");
+      document.getElementById("qrScannerModal").style.display = "none";
+    }
+
+    function switchQrSource(source) {
+      const btnCam = document.getElementById("btnSourceCamera");
+      const btnFile = document.getElementById("btnSourceFile");
+      const camArea = document.getElementById("qrCameraArea");
+      const fileArea = document.getElementById("qrFileArea");
+      
+      if (source === 'camera') {
+        btnCam.className = "btn-submit";
+        btnCam.style.background = "var(--color-primary)";
+        btnCam.style.color = "#fff";
+        btnFile.className = "btn-secondary";
+        btnFile.style.background = "";
+        btnFile.style.color = "";
+        
+        camArea.style.display = "flex";
+        fileArea.style.display = "none";
+        
+        startQrCamera();
+      } else {
+        btnFile.className = "btn-submit";
+        btnFile.style.background = "var(--color-primary)";
+        btnFile.style.color = "#fff";
+        btnCam.className = "btn-secondary";
+        btnCam.style.background = "";
+        btnCam.style.color = "";
+        
+        fileArea.style.display = "flex";
+        camArea.style.display = "none";
+        
+        stopQrCamera();
+      }
+    }
+
+    async function startQrCamera() {
+      stopQrCamera();
+      const video = document.getElementById("qrVideo");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "environment" } 
+        });
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true);
+        video.play();
+        qrVideoTrack = stream.getVideoTracks()[0];
+        qrScannerActive = true;
+        requestAnimationFrame(scanQrFrame);
+      } catch (err) {
+        showToast("לא ניתן לגשת למצלמה. אנא ודא שאישרת הרשאות או בחר בהעלאת תמונה.", "error");
+        switchQrSource('file');
+      }
+    }
+
+    function stopQrCamera() {
+      qrScannerActive = false;
+      const video = document.getElementById("qrVideo");
+      if (video && video.srcObject) {
+        const stream = video.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        video.srcObject = null;
+      }
+      qrVideoTrack = null;
+    }
+
+    function scanQrFrame() {
+      if (!qrScannerActive) return;
+      const video = document.getElementById("qrVideo");
+      if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+        
+        if (code) {
+          processQrCodeResult(code.data);
+          return;
+        }
+      }
+      requestAnimationFrame(scanQrFrame);
+    }
+
+    function processQrCodeResult(text) {
+      if (text.startsWith("otpauth://")) {
+        try {
+          const url = new URL(text);
+          if (url.protocol === "otpauth:") {
+            const secret = url.searchParams.get("secret");
+            let issuer = url.searchParams.get("issuer") || "";
+            let label = decodeURIComponent(url.pathname.replace(/^\/\/totp\//, ""));
+            let email = "";
+            let name = "חשבון גוגל";
+            
+            if (label.includes(":")) {
+              const parts = label.split(":");
+              issuer = parts[0].trim();
+              label = parts.slice(1).join(":").trim();
+            }
+            
+            if (label.includes("@")) {
+              email = label;
+              name = (issuer ? issuer : "חשבון גוגל");
+            } else {
+              name = label || (issuer ? issuer : "חשבון גוגל");
+            }
+            
+            if (secret) {
+              document.getElementById("accSecret").value = secret.toUpperCase();
+              document.getElementById("accName").value = name;
+              if (email) {
+                document.getElementById("accEmail").value = email;
+              }
+              showToast("קוד ה-QR נסרק בהצלחה! הפרטים הוזנו.", "success");
+              closeQrScanner();
+              return;
+            }
+          }
+        } catch (e) {}
+      }
+      
+      const cleanText = text.trim().replace(/\s/g, "");
+      if (/^[A-Z2-7=]+$/i.test(cleanText)) {
+        document.getElementById("accSecret").value = cleanText.toUpperCase();
+        showToast("מפתח סודי נסרק בהצלחה מהקוד!", "success");
+        closeQrScanner();
+        return;
+      }
+      
+      showToast("נסרק מידע שאינו מפתח סודי תקין של גוגל!", "warning");
+    }
+
+    function triggerQrFileSelect() {
+      document.getElementById("qrFileInput").click();
+    }
+    
+    function handleQrFileSelect(event) {
+      const files = event.target.files || (event.dataTransfer && event.dataTransfer.files);
+      const file = files ? files[0] : null;
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          document.getElementById("qrFilePreview").src = img.src;
+          document.getElementById("qrFilePreviewContainer").style.display = "block";
+          
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          
+          if (code) {
+            processQrCodeResult(code.data);
+          } else {
+            showToast("לא זוהה קוד QR בתמונה. נסה תמונה ברורה יותר או צילום מסך ממוקד.", "error");
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      if (event.target && event.target.value) {
+        event.target.value = "";
+      }
+    }
+
+    function initQrDropZone() {
+      const dropZone = document.getElementById("qrDropZone");
+      if (dropZone) {
+        dropZone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          dropZone.style.borderColor = "var(--color-success)";
+          dropZone.style.background = "rgba(22, 128, 61, 0.05)";
+        });
+        dropZone.addEventListener("dragleave", (e) => {
+          e.preventDefault();
+          dropZone.style.borderColor = "var(--color-primary)";
+          dropZone.style.background = "rgba(109, 40, 217, 0.02)";
+        });
+        dropZone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          dropZone.style.borderColor = "var(--color-primary)";
+          dropZone.style.background = "rgba(109, 40, 217, 0.02)";
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleQrFileSelect({ dataTransfer: e.dataTransfer });
+          }
+        });
+      }
     }
   </script>
 
