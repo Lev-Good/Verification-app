@@ -6,6 +6,9 @@
   <title>Master Authenticator - מאמת חשבונות גוגל מרכזי ומאובטח</title>
   <meta name="description" content="כלי מאובטח ומרכזי לניהול מפתחות אימות TOTP וקודי גיבוי לחשבונות גוגל בעיצוב מודרני.">
   
+  <!-- אייקון האתר (Favicon) למניעת שגיאת 404 -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛡️</text></svg>">
+  
   <!-- פונטים מודרניים מגוגל -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2226,7 +2229,7 @@
         const response = await fetch(DEVELOPER_SCRIPT_URL, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "text/plain;charset=utf-8"
           },
           body: JSON.stringify({
             action: "get_vault",
@@ -2302,7 +2305,7 @@
             const saveResp = await fetch(DEVELOPER_SCRIPT_URL, {
               method: "POST",
               headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "text/plain;charset=utf-8"
               },
               body: JSON.stringify({
                 action: "save_vault",
@@ -2382,7 +2385,7 @@
         const response = await fetch(DEVELOPER_SCRIPT_URL, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "text/plain;charset=utf-8"
           },
           body: JSON.stringify({
             action: "save_vault",
