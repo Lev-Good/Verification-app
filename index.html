@@ -1,0 +1,3033 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Master Authenticator - מאמת חשבונות גוגל מרכזי ומאובטח</title>
+  <meta name="description" content="כלי מאובטח ומרכזי לניהול מפתחות אימות TOTP וקודי גיבוי לחשבונות גוגל בעיצוב מודרני.">
+  
+  <!-- פונטים מודרניים מגוגל -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&family=Source+Code+Pro:wght@400;700&display=swap" rel="stylesheet">
+  
+    <style>
+    /* ----------------------------------------------------
+       Design System & CSS Variables (Light Theme Palette)
+       ---------------------------------------------------- */
+    :root {
+      --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+      --glass-bg: rgba(255, 255, 255, 0.55);
+      --glass-border: rgba(15, 23, 42, 0.08);
+      --glass-highlight: rgba(255, 255, 255, 0.4);
+      
+      --color-primary: #6d28d9; /* סגול מלכותי בהיר קריא */
+      --color-secondary: #0e7490; /* כחול-טורקיז עמוק */
+      --color-success: #16803d; /* ירוק כהה קריא */
+      --color-warning: #b45309; /* כתום ענבר כהה */
+      --color-danger: #b91c1c; /* אדום */
+      
+      --text-main: #0f172a; /* Slate 900 */
+      --text-muted: #475569; /* Slate 600 */
+      --font-family: 'Rubik', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Source Code Pro', monospace;
+      
+      --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ----------------------------------------------------
+       Base Styles & Reset
+       ---------------------------------------------------- */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* אפקטים עדינים של גלואו צבעוני ברקע הבהיר */
+    body::before {
+      content: '';
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(109, 40, 217, 0.06) 0%, rgba(255, 255, 255, 0) 70%);
+      top: -100px;
+      left: -100px;
+      z-index: -1;
+      pointer-events: none;
+    }
+    
+    body::after {
+      content: '';
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(14, 116, 144, 0.05) 0%, rgba(255, 255, 255, 0) 70%);
+      bottom: -100px;
+      right: -100px;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    a {
+      color: var(--color-primary);
+      text-decoration: none;
+      transition: var(--transition-smooth);
+    }
+    
+    a:hover {
+      text-shadow: 0 0 8px rgba(109, 40, 217, 0.2);
+      text-decoration: underline;
+    }
+
+    button {
+      font-family: var(--font-family);
+      cursor: pointer;
+      border: none;
+      outline: none;
+      transition: var(--transition-smooth);
+    }
+
+    input, textarea {
+      font-family: var(--font-family);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--text-main);
+      border-radius: 8px;
+      padding: 12px 16px;
+      outline: none;
+      transition: var(--transition-smooth);
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: #94a3b8;
+    }
+
+    input:focus, textarea:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 12px rgba(109, 40, 217, 0.15);
+      background: #ffffff;
+    }
+
+    /* ----------------------------------------------------
+       Glassmorphism Panel Styles (Light Theme)
+       ---------------------------------------------------- */
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glass-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+      background: linear-gradient(135deg, var(--glass-highlight) 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    /* ----------------------------------------------------
+       App Screens Layout
+       ---------------------------------------------------- */
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-grow: 1;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ----------------------------------------------------
+       1. Lock & Register Screens
+       ---------------------------------------------------- */
+    .auth-container {
+      width: 100%;
+      max-width: 450px;
+      padding: 40px 30px;
+      text-align: center;
+    }
+
+    .logo-container {
+      margin-bottom: 25px;
+      position: relative;
+      display: inline-block;
+    }
+
+    .logo-icon {
+      font-size: 50px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 4px 10px rgba(109, 40, 217, 0.2));
+    }
+
+    .auth-title {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #0f172a, #334155);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .auth-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      text-align: right;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .form-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding-right: 40px;
+    }
+
+    .input-icon {
+      position: absolute;
+      right: 14px;
+      bottom: 13px;
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+
+    .input-help {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--color-primary) 0%, #5b21b6 100%);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(109, 40, 217, 0.2);
+      margin-top: 10px;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(109, 40, 217, 0.35);
+      filter: brightness(1.05);
+    }
+    
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    .forgot-link-container {
+      margin-top: 20px;
+      font-size: 13px;
+    }
+
+    /* ----------------------------------------------------
+       2. Dashboard Layout
+       ---------------------------------------------------- */
+    .dashboard-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 25px;
+      margin-bottom: 25px;
+      border-radius: 16px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-logo-icon {
+      font-size: 28px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      background: rgba(22, 128, 61, 0.08);
+      color: var(--color-success);
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(22, 128, 61, 0.15);
+      font-weight: 600;
+    }
+
+    .status-badge.disconnected {
+      background: rgba(180, 83, 9, 0.08);
+      color: var(--color-warning);
+      border-color: rgba(180, 83, 9, 0.15);
+    }
+
+    .btn-icon-only {
+      background: rgba(15, 23, 42, 0.05);
+      color: var(--text-main);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--glass-border);
+    }
+
+    .btn-icon-only:hover {
+      background: rgba(15, 23, 42, 0.1);
+      border-color: var(--color-secondary);
+      color: var(--color-secondary);
+      box-shadow: 0 0 10px rgba(14, 116, 144, 0.15);
+    }
+
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 25px;
+      width: 100%;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Sidebar Menu */
+    .control-sidebar {
+      padding: 25px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .sidebar-title {
+      font-size: 16px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--glass-border);
+      padding-bottom: 10px;
+      margin-bottom: 5px;
+    }
+
+    .search-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .search-input {
+      width: 100%;
+      padding-right: 40px;
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .search-icon {
+      position: absolute;
+      right: 14px;
+      top: 14px;
+      color: var(--text-muted);
+    }
+
+    .btn-add-account {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--color-secondary) 0%, #0e7490 100%);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(14, 116, 144, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-add-account:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(14, 116, 144, 0.35);
+      filter: brightness(1.05);
+    }
+
+    .nav-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-tab-btn {
+      width: 100%;
+      padding: 12px 16px;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 8px;
+      text-align: right;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-tab-btn:hover {
+      background: rgba(15, 23, 42, 0.03);
+      color: var(--text-main);
+    }
+
+    .nav-tab-btn.active {
+      background: rgba(109, 40, 217, 0.08);
+      color: var(--color-primary);
+      border-right: 3px solid var(--color-primary);
+    }
+
+    /* Content Area */
+    .content-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .view-title-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .view-title {
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .accounts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 20px;
+      width: 100%;
+    }
+
+    @media (max-width: 450px) {
+      .accounts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Google Account Card */
+    .account-card {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      position: relative;
+      transition: var(--transition-smooth);
+      background: rgba(255, 255, 255, 0.65);
+    }
+
+    .account-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(109, 40, 217, 0.18);
+      box-shadow: 0 12px 24px rgba(31, 38, 135, 0.08);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .account-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-width: 75%;
+    }
+
+    .account-label {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .account-email {
+      font-size: 12px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-action-small {
+      background: transparent;
+      color: var(--text-muted);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .btn-action-small:hover {
+      background: rgba(15, 23, 42, 0.05);
+      color: var(--text-main);
+    }
+    
+    .btn-action-small.delete:hover {
+      color: var(--color-danger);
+      background: rgba(185, 28, 28, 0.08);
+    }
+
+    /* OTP Code Row */
+    .code-display-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 10px;
+      padding: 10px 16px;
+      border: 1px solid rgba(15, 23, 42, 0.05);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .code-display-row:hover {
+      background: #ffffff;
+      border-color: rgba(15, 23, 42, 0.1);
+    }
+
+    .totp-code {
+      font-family: var(--font-mono);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--color-secondary);
+      letter-spacing: 1px;
+      transition: var(--transition-smooth);
+    }
+
+    .account-card.copied .totp-code {
+      color: var(--color-success);
+    }
+
+    /* SVG Circular Countdown Timer */
+    .timer-container {
+      width: 36px;
+      height: 36px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .timer-svg {
+      transform: rotate(-90deg);
+      width: 36px;
+      height: 36px;
+    }
+
+    .timer-circle-bg {
+      fill: none;
+      stroke: rgba(15, 23, 42, 0.05);
+      stroke-width: 3.5;
+    }
+
+    .timer-circle {
+      fill: none;
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.1s linear, stroke var(--transition-smooth);
+    }
+
+    .timer-text {
+      position: absolute;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    /* Accordion Toggle */
+    .toggle-details-btn {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .toggle-details-btn:hover {
+      background: rgba(15, 23, 42, 0.05);
+      color: var(--text-main);
+    }
+
+    .card-details {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      border-top: 1px dashed var(--glass-border);
+      padding-top: 15px;
+      animation: slideDown 0.3s ease-out forwards;
+    }
+
+    .account-card.expanded .card-details {
+      display: flex;
+    }
+    
+    .account-card.expanded .toggle-details-btn svg {
+      transform: rotate(180deg);
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .detail-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .notes-box {
+      background: rgba(15, 23, 42, 0.03);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 13px;
+      color: #334155;
+      border: 1px solid rgba(15, 23, 42, 0.04);
+      white-space: pre-wrap;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
+    .backup-codes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .backup-code-item {
+      background: rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      border-radius: 6px;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: var(--transition-smooth);
+    }
+
+    .backup-code-item:hover {
+      background: rgba(255, 255, 255, 0.95);
+      border-color: rgba(15, 23, 42, 0.12);
+    }
+
+    .backup-code-text {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #1e293b;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .backup-code-item.used {
+      opacity: 0.35;
+      text-decoration: line-through;
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .backup-code-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .btn-code-action {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 2px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    .btn-code-action:hover {
+      background: rgba(15, 23, 42, 0.05);
+      color: var(--text-main);
+    }
+    
+    .btn-code-action.use-toggle:hover {
+      color: var(--color-warning);
+    }
+
+    /* Empty State View */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 40px;
+      text-align: center;
+      width: 100%;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      color: var(--text-muted);
+      margin-bottom: 15px;
+      opacity: 0.5;
+    }
+
+    .empty-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .empty-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 320px;
+      line-height: 1.5;
+    }
+
+    /* ----------------------------------------------------
+       3. Settings Screen
+       ---------------------------------------------------- */
+    .settings-view {
+      display: none;
+      flex-direction: column;
+      gap: 25px;
+      width: 100%;
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+
+    .settings-view.active {
+      display: flex;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 25px;
+      width: 100%;
+    }
+
+    .settings-card {
+      padding: 25px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .settings-card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--glass-border);
+      padding-bottom: 12px;
+    }
+
+    .settings-action-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--text-main);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      border-radius: 8px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.95);
+      border-color: rgba(15, 23, 42, 0.2);
+    }
+    
+    .btn-secondary.danger:hover {
+      background: rgba(185, 28, 28, 0.08);
+      border-color: var(--color-danger);
+      color: var(--color-danger);
+    }
+
+    /* ----------------------------------------------------
+       4. Embedded User Guide
+       ---------------------------------------------------- */
+    .guide-container {
+      line-height: 1.8;
+      font-size: 15px;
+      color: #334155;
+    }
+
+    .guide-section {
+      margin-bottom: 30px;
+    }
+
+    .guide-step-card {
+      background: rgba(255, 255, 255, 0.55);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin-top: 12px;
+      position: relative;
+    }
+
+    .guide-step-number {
+      position: absolute;
+      top: -12px;
+      right: 20px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      color: #fff;
+      font-weight: bold;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      box-shadow: 0 4px 10px rgba(109, 40, 217, 0.2);
+    }
+
+    .guide-step-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+      margin-top: 2px;
+    }
+
+    .info-alert {
+      background: rgba(14, 116, 144, 0.06);
+      border-right: 4px solid var(--color-secondary);
+      border-radius: 6px;
+      padding: 12px 18px;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #1e293b;
+    }
+
+    .warning-alert {
+      background: rgba(180, 83, 9, 0.06);
+      border-right: 4px solid var(--color-warning);
+      border-radius: 6px;
+      padding: 12px 18px;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #1e293b;
+    }
+
+    .guide-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      font-size: 13px;
+      font-weight: bold;
+      margin: 8px 0;
+      transition: var(--transition-smooth);
+    }
+
+    .guide-link-btn:hover {
+      background: var(--color-secondary);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(14, 116, 144, 0.2);
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+
+    /* ----------------------------------------------------
+       5. Modals & Add Account Guide
+       ---------------------------------------------------- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.35); /* Soft darken backdrop */
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-container {
+      width: 100%;
+      max-width: 950px;
+      padding: 30px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.15);
+      animation: modalFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    @keyframes modalFadeIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-layout {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 30px;
+      width: 100%;
+    }
+
+    @media (max-width: 850px) {
+      .modal-layout {
+        grid-template-columns: 1fr;
+      }
+      .modal-guide-column {
+        order: 2;
+      }
+    }
+
+    .modal-form-column {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .modal-guide-column {
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 15px;
+      max-height: 520px;
+      overflow-y: auto;
+      border-right: 3px solid var(--color-primary);
+    }
+
+    .modal-guide-step {
+      display: none;
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+
+    .modal-guide-step.active {
+      display: block;
+    }
+
+    .modal-guide-step-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-guide-img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin-top: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      background: #ffffff;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+    }
+
+    .modal-backup-codes-container {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+      animation: slideDown 0.3s ease-out forwards;
+    }
+
+    .modal-codes-input-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--glass-border);
+      padding-bottom: 12px;
+    }
+
+    .modal-close-btn {
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .modal-close-btn:hover {
+      color: var(--text-main);
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 15px;
+      border-top: 1px solid var(--glass-border);
+      padding-top: 15px;
+    }
+
+    /* ----------------------------------------------------
+       6. Toast Notifications (Light Theme)
+       ---------------------------------------------------- */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      color: var(--text-main);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 12px 24px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(31, 38, 135, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      animation: toastSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      min-width: 280px;
+      pointer-events: auto;
+    }
+
+    @keyframes toastSlideIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .toast.success { border-right: 4px solid var(--color-success); }
+    .toast.error { border-right: 4px solid var(--color-danger); }
+    .toast.warning { border-right: 4px solid var(--color-warning); }
+    .toast.info { border-right: 4px solid var(--color-secondary); }
+
+    /* ----------------------------------------------------
+       7. Screenshot Navigation Tabs (Interactive Guide)
+       ---------------------------------------------------- */
+    .ss-tabs {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scrollbar-width: thin;
+    }
+    .ss-tab {
+      background: rgba(15, 23, 42, 0.04);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+    }
+    .ss-tab:hover {
+      background: rgba(15, 23, 42, 0.08);
+      color: var(--text-main);
+    }
+    .ss-tab.active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+    .ss-content {
+      display: none;
+      margin-top: 10px;
+    }
+    .ss-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================
+       טוסטים מונפשים (Toasts Container)
+       ========================================== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ==========================================
+       מסך 1: הגדרת מערכת לראשונה (Setup Screen)
+       ========================================== -->
+  <div class="screen" id="setupScreen">
+    <div class="auth-container glass-panel">
+      <div class="logo-container">
+        <span class="logo-icon">🔑</span>
+      </div>
+      <h2 class="auth-title">הגדרת מאמת מאסטר</h2>
+      <p class="auth-desc">ברוך הבא! צור סיסמה ראשית מאובטחת להגנה על כל חשבונות גוגל שלך במקום אחד.</p>
+      
+      <form id="setupForm" onsubmit="handleSetupSubmit(event)">
+        <div class="form-group">
+          <label for="setupPassword">סיסמת מאסטר ראשית:</label>
+          <input type="password" id="setupPassword" placeholder="הקלד סיסמה חזקה..." required>
+          <span class="input-icon">🔒</span>
+          <div class="input-help">סיסמה זו תשמש לפתיחת האפליקציה ולהצפנת המפתחות. נא לא לשכוח אותה!</div>
+        </div>
+        
+        <div class="form-group">
+          <label for="setupPasswordConfirm">אימות סיסמה מחדש:</label>
+          <input type="password" id="setupPasswordConfirm" placeholder="הקלד את הסיסמה שוב..." required>
+          <span class="input-icon">🛡️</span>
+        </div>
+        
+        <div class="form-group">
+          <label for="setupEmail">כתובת אימייל לשחזור (גיבוי):</label>
+          <input type="email" id="setupEmail" placeholder="example@gmail.com" required>
+          <span class="input-icon">📧</span>
+          <div class="input-help">כתובת המייל אליה תישלח הסיסמה המאובטחת במקרה של שכחה.</div>
+        </div>
+        
+        <button type="submit" class="btn-submit">צור מערכת והיכנס 🚀</button>
+      </form>
+
+      <!-- קרדיט ליוצר -->
+      <div style="margin-top: 20px; padding-top: 12px; text-align: center; font-size: 11.5px; border-top: 1px dashed var(--glass-border);">
+        <span style="color: var(--text-muted);">נוצר על ידי <a href="https://lev-good.github.io/Good-heart/" target="_blank" style="font-weight: 700; color: var(--color-primary); text-decoration: none;">לב טוב</a></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       מסך 2: מסך נעילת מאסטר (Lock Screen)
+       ========================================== -->
+  <div class="screen" id="lockScreen">
+    <div class="auth-container glass-panel">
+      <div class="logo-container">
+        <span class="logo-icon">🔒</span>
+      </div>
+      <h2 class="auth-title">כניסה מאובטחת</h2>
+      <p class="auth-desc">אנא הזן את פרטי החשבון שלך כדי לפתוח את מפתחות האימות.</p>
+      
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)">
+        <div class="form-group">
+          <label for="lockEmail">כתובת אימייל (חשבון ענן):</label>
+          <input type="email" id="lockEmail" placeholder="example@gmail.com" required autocomplete="username">
+          <span class="input-icon">📧</span>
+        </div>
+
+        <div class="form-group">
+          <label for="lockPassword">סיסמת מאסטר:</label>
+          <input type="password" id="lockPassword" placeholder="הזן סיסמת מאסטר..." required autocomplete="current-password">
+          <span class="input-icon">🔑</span>
+        </div>
+        
+        <button type="submit" class="btn-submit">התחברות ופתיחה 🔓</button>
+      </form>
+      
+      <div class="forgot-link-container">
+        <a href="#" onclick="showForgotPasswordInfo(event)">מידע על אבטחה ושחזור (Zero-Knowledge) ℹ️</a>
+      </div>
+
+      <!-- קרדיט ליוצר -->
+      <div style="margin-top: 20px; padding-top: 12px; text-align: center; font-size: 11.5px; border-top: 1px dashed var(--glass-border);">
+        <span style="color: var(--text-muted);">נוצר על ידי <a href="https://lev-good.github.io/Good-heart/" target="_blank" style="font-weight: 700; color: var(--color-primary); text-decoration: none;">לב טוב</a></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       מסך 3: לוח הבקרה הראשי (Dashboard Panel)
+       ========================================== -->
+  <div class="screen" id="dashboardScreen">
+    
+    <!-- כותרת ראשית (Header) -->
+    <header class="dashboard-header glass-panel">
+      <div class="header-left">
+        <span class="header-logo-icon">🛡️</span>
+        <h1 class="header-title">Master Authenticator</h1>
+      </div>
+      
+      <div class="header-right">
+        <div class="status-badge" id="syncStatus">
+          <span>●</span>
+          <span id="syncStatusText">מאובטח מקומית</span>
+        </div>
+        <button class="btn-icon-only" onclick="lockApp()" title="נעילת אפליקציה">
+          <span>🔒</span>
+        </button>
+      </div>
+    </header>
+    
+    <!-- פריסת הלוח (Layout) -->
+    <div class="dashboard-layout">
+      
+      <!-- פאנל שליטה צדדי (Sidebar) -->
+      <aside class="control-sidebar glass-panel">
+        <div class="sidebar-title">ניווט ושליטה</div>
+        
+        <div class="search-wrapper">
+          <input type="text" class="search-input" id="searchInput" placeholder="חפש חשבון..." oninput="filterAccounts()">
+          <span class="search-icon">🔍</span>
+        </div>
+        
+        <button class="btn-add-account" onclick="openAddModal()">
+          <span>➕</span>
+          <span>הוסף חשבון גוגל חדש</span>
+        </button>
+        
+        <nav class="nav-tabs">
+          <button class="nav-tab-btn active" id="tabBtnAccounts" onclick="switchTab('accounts')">
+            <span>👥</span>
+            <span>חשבונות גוגל שלי</span>
+          </button>
+          <button class="nav-tab-btn" id="tabBtnGuide" onclick="switchTab('guide')">
+            <span>📖</span>
+            <span>מדריך למשתמש (פשוט)</span>
+          </button>
+          <button class="nav-tab-btn" id="tabBtnSettings" onclick="switchTab('settings')">
+            <span>⚙️</span>
+            <span>הגדרות ואבטחה</span>
+          </button>
+        </nav>
+        
+        <!-- קרדיט ליוצר -->
+        <div style="margin-top: auto; padding-top: 15px; text-align: center; font-size: 11.5px; border-top: 1px solid var(--glass-border);">
+          <span style="color: var(--text-muted);">נוצר על ידי <a href="https://lev-good.github.io/Good-heart/" target="_blank" style="font-weight: 700; color: var(--color-primary); text-decoration: none;">לב טוב</a></span>
+        </div>
+      </aside>
+      
+      <!-- תוכן מרכזי -->
+      <main class="content-panel">
+        
+        <!-- א. תצוגת חשבונות (Accounts View) -->
+        <div id="accountsView" style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+          <div class="view-title-container">
+            <h2 class="view-title" id="accountsCountTitle">חשבונות פעילים (0)</h2>
+          </div>
+          
+          <div class="accounts-grid" id="accountsGrid">
+            <!-- כרטיסי החשבונות ייטענו כאן דינמית -->
+          </div>
+        </div>
+        
+                <!-- ב. תצוגת המדריך המובנה למשתמש (Embedded Guide View) -->
+        <div class="settings-view" id="guideView">
+          <h2 class="view-title">📖 מדריך למשתמש - פשוט כמו משחק!</h2>
+          
+          <div class="glass-panel guide-container" style="padding: 30px;">
+            <div class="guide-section">
+              <p style="font-size: 16px; margin-bottom: 20px; text-align: center; color: var(--text-main); font-weight: 500;">
+                ברוך הבא למדריך המובנה של <strong>Master Authenticator</strong>! כאן תלמד בדיוק איך למצוא ולהוסיף את חשבונות גוגל שלך לתוכנה בשלבים פשוטים ומצולמים.
+              </p>
+              
+              <div style="text-align: center; margin: 25px 0;">
+                <img src="master_authenticator_concept.png" alt="Concept Logo" style="max-width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--glass-border); box-shadow: 0 8px 24px rgba(0,0,0,0.05);">
+              </div>
+            </div>
+            
+            <div class="guide-section">
+              <h3 style="font-size: 16px; font-weight: 700; color: var(--color-secondary); border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">🛡️ א. הגדרת אימות דו-שלבי בגוגל וקבלת המפתח</h3>
+              <p class="input-help" style="font-size: 13.5px; margin-top: 8px;">כדי להוסיף חשבון גוגל למאמת המרכזי שלנו, עלינו להפעיל את האימות הדו-שלבי בחשבון גוגל שלך ולקבל את <strong>המפתח הסודי</strong> שלו:</p>
+              
+              <div class="guide-step-card">
+                <span class="guide-step-number">1</span>
+                <div class="guide-step-title">כניסה לאבטחת החשבון והפעלת אימות דו-שלבי:</div>
+                <p class="input-help" style="font-size: 13px; margin-bottom: 8px;">כנס לדף אבטחת החשבון של גוגל ולחץ על "אימות דו-שלבי". תוכל להיכנס ישירות מכאן:</p>
+                <a href="https://g.co/2sv" target="_blank" class="guide-link-btn">🔗 קישור להפעלת אימות דו-שלבי בגוגל</a>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-top: 12px;">
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב א' - הפעלת האימות:</span>
+                    <img src="תמונות מסך/הפעלת אימות דו שלבי.png" alt="הפעלת אימות דו שלבי" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב ב' - הוספת טלפון לאימות:</span>
+                    <img src="תמונות מסך/הוספת מספר טלפון.png" alt="הוספת מספר טלפון" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step-card" style="margin-top: 20px;">
+                <span class="guide-step-number">2</span>
+                <div class="guide-step-title">הוספת אפליקציית מאמת:</div>
+                <p class="input-help" style="font-size: 13px; margin-bottom: 8px;">בתוך דף האימות הדו-שלבי, גלול מטה עד שתראה את האפשרות <strong>"אפליקציית מאמת" (Authenticator app)</strong> ולחץ עליה, ולאחר מכן לחץ על <strong>"הגדרת מאמת"</strong>.</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-top: 12px;">
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב א' - בחירת מאמת:</span>
+                    <img src="תמונות מסך/כניסה להוספת אפליקציה לאימות חשבונות.png" alt="בחירת מאמת" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב ב' - לחיצה על הגדרת מאמת:</span>
+                    <img src="תמונות מסך/הגדרת מאמת חשבונות.png" alt="הגדרת מאמת" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-step-card" style="margin-top: 20px;">
+                <span class="guide-step-number">3</span>
+                <div class="guide-step-title">חשיפת המפתח הסודי והעתקתו:</div>
+                <p class="input-help" style="font-size: 13px; margin-bottom: 8px;">גוגל תציג ברקוד. לחץ על הקישור שמתחת לברקוד שנקרא <strong>"לא מצליח לסרוק?" (Can't scan it?)</strong>. גוגל תחשוף קוד סודי ארוך ומיוחד (אותיות ומספרים). העתק את הקוד הזה!</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-top: 12px;">
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב א' - לחיצה על "לא מצליח לסרוק":</span>
+                    <img src="תמונות מסך/לא הצלחת לסרוק את הקוד.png" alt="לא מצליח לסרוק" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב ב' - העתקת המפתח הסודי:</span>
+                    <img src="תמונות מסך/הקוד להעתיק מגוגל.png" alt="מפתח סודי מגוגל" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-section">
+              <h3 style="font-size: 16px; font-weight: 700; color: var(--color-secondary); border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">🔑 ב. הוספת המפתח הסודי ואימותו</h3>
+              <div class="guide-step-card">
+                <span class="guide-step-number">4</span>
+                <div class="guide-step-title">הוספה לתוכנה והזנת הקוד לאימות בגוגל:</div>
+                <p class="input-help" style="font-size: 13px; margin-bottom: 8px;">לחץ על "הוסף חשבון גוגל חדש" בתוכנה שלנו, הזן את שם החשבון והדבק את המפתח הסודי. לאחר מכן, לחץ "הבא" בגוגל והקלד את קוד ה-6 ספרות שמופק כעת בתוכנה לצורך אימות סופי.</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-top: 12px;">
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב א' - אימות הקוד בגוגל:</span>
+                    <img src="תמונות מסך/הקלדת הוקד מאפליקציה מגוגל.png" alt="הזנת קוד בגוגל" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב ב' - סיום ההגדרה בהצלחה:</span>
+                    <img src="תמונות מסך/הפעלת אימות דו שלבי לאחר הגדרת האפליקציה.png" alt="סיום הגדרה" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-section">
+              <h3 style="font-size: 16px; font-weight: 700; color: var(--color-secondary); border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">💾 ג. שמירת קודי הגיבוי והערות</h3>
+              <div class="guide-step-card">
+                <span class="guide-step-number">5</span>
+                <div class="guide-step-title">מציאת קודי גיבוי (Backup Codes) בגוגל והעלאתם:</div>
+                <p class="input-help" style="font-size: 13px; margin-bottom: 8px;">בדף האימות הדו-שלבי בגוגל, לחץ על **"קודי גיבוי" (Backup codes)**. תוכל להוריד את קובץ הגיבוי כקובץ טקסט (TXT) ולהעלות אותו ישירות בלחצן "טען קובץ גיבוי" בטופס הוספת החשבון!</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-top: 12px;">
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב א' - כניסה לקודי גיבוי:</span>
+                    <img src="תמונות מסך/לקבלת קודי גיבוי.png" alt="כניסה לקודי גיבוי" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                  <div>
+                    <span class="input-help" style="font-weight: bold; display: block; margin-bottom: 4px;">שלב ב' - הורדת קובץ הטקסט:</span>
+                    <img src="תמונות מסך/הורדת הקודי גיבוי.png" alt="הורדת קובץ טקסט" style="width: 100%; border-radius: 8px; border: 1px solid var(--glass-border);">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="guide-section">
+              <h3 style="font-size: 16px; font-weight: 700; color: var(--color-secondary); border-bottom: 1px solid var(--glass-border); padding-bottom: 8px;">⏳ ד. שימוש יומיומי</h3>
+              <p class="input-help" style="font-size: 13.5px; margin-top: 8px;">
+                - **העתקת קוד TOTP:** פשוט לחץ קליק אחד על קוד ה-6 ספרות הגדול של החשבון. הוא יועתק אוטומטית ללוח שלך. עכשיו הדבק אותו בגוגל!
+                <br>
+                - **טיימר השניות:** העיגול המונפש מציג כמה שניות נותרו לקוד (הקודים מתחלפים אוטומטית כל 30 שניות בדיוק!).
+              </p>
+              
+              <div class="info-alert">
+                <strong>📧 שכחת סיסמה?</strong> לחץ על "שכחת סיסמה?" במסך הנעילה של התוכנה, ושרת השחזור המרכזי של מפתח התוכנה ישלח אליך מייל מעוצב ומאובטח המכיל את הסיסמה שלך תוך שניות בודדות!
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- ג. תצוגת הגדרות (Settings View) -->
+        <div class="settings-view" id="settingsView">
+          <h2 class="view-title">הגדרות ואבטחה</h2>
+          
+          <div class="settings-grid">
+            
+            <!-- כרטיס סנכרון גוגל שיטס -->
+            <div class="settings-card glass-panel">
+              <h3 class="settings-card-title">
+                <span>📧</span>
+                <span>אימייל לשחזור סיסמה</span>
+              </h3>
+              
+              <form id="settingsSyncForm" onsubmit="handleSyncSave(event)">
+                <div class="form-group">
+                  <label for="settingsEmail">כתובת אימייל לשחזור:</label>
+                  <input type="email" id="settingsEmail" placeholder="example@gmail.com" required>
+                  <span class="input-icon">📧</span>
+                  <div class="input-help">כתובת המייל שבה רשמת את הסיסמה. כאשר תלחץ על "שכחת סיסמה", שרת הגיבוי המרכזי ישלח לכתובת זו אימייל מעוצב עם הסיסמה שלך.</div>
+                </div>
+                
+                <button type="submit" class="btn-submit" style="margin-top: 0;">שמור כתובת מייל 💾</button>
+              </form>
+            </div>
+            
+            <!-- כרטיס שינוי סיסמה -->
+            <div class="settings-card glass-panel">
+              <h3 class="settings-card-title">
+                <span>🔐</span>
+                <span>שינוי סיסמת מאסטר</span>
+              </h3>
+              
+              <form id="changePasswordForm" onsubmit="handleChangePassword(event)">
+                <div class="form-group">
+                  <label for="oldPassword">סיסמה נוכחית:</label>
+                  <input type="password" id="oldPassword" placeholder="הקלד סיסמה נוכחית..." required>
+                  <span class="input-icon">🔒</span>
+                </div>
+                
+                <div class="form-group">
+                  <label for="newPassword">סיסמה חדשה:</label>
+                  <input type="password" id="newPassword" placeholder="הקלד סיסמה חדשה..." required>
+                  <span class="input-icon">🔑</span>
+                </div>
+                
+                <button type="submit" class="btn-submit" style="margin-top: 0;">עדכן סיסמה ושמור 💾</button>
+              </form>
+            </div>
+            
+            <!-- כרטיס ייצוא וייבוא נתונים -->
+            <div class="settings-card glass-panel">
+              <h3 class="settings-card-title">
+                <span>💾</span>
+                <span>ייבוא וייצוא נתונים (גיבוי ידני)</span>
+              </h3>
+              
+              <p class="input-help" style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+                תוכל לייצא את כל החשבונות, ההערות וקודי הגיבוי שלך לקובץ מוצפן. קובץ זה מוגן בסיסמת המאסטר הנוכחית שלך. תוכל לייבא אותו בכל שלב מחדש למכשיר זה או אחר.
+              </p>
+              
+              <div class="settings-action-row" style="margin-top: 10px;">
+                <button class="btn-submit" style="margin-top: 0; background: linear-gradient(135deg, var(--color-success) 0%, #059669 100%); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);" onclick="exportData()">
+                  <span>📥</span> לייצא גיבוי מוצפן
+                </button>
+                
+                <button class="btn-secondary" onclick="triggerImport()">
+                  <span>📤</span> ייבא קובץ גיבוי
+                </button>
+                <input type="file" id="importFileInput" style="display: none;" accept=".json" onchange="importData(event)">
+              </div>
+            </div>
+            
+            <!-- כרטיס מחיקת כל הנתונים -->
+            <div class="settings-card glass-panel" style="border-color: rgba(239, 68, 68, 0.2);">
+              <h3 class="settings-card-title" style="color: var(--color-danger); border-bottom-color: rgba(239, 68, 68, 0.15)">
+                <span>⚠️</span>
+                <span>אזור סכנה (איפוס מלא)</span>
+              </h3>
+              
+              <p class="input-help" style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+                לחיצה על כפתור זה תמחק לחלוטין את כל החשבונות המאוחסנים, סיסמת המאסטר וההגדרות ממחשב זה. לא ניתן לבטל פעולה זו!
+              </p>
+              
+              <button class="btn-secondary danger" onclick="resetWholeSystem()">
+                ❌ אפס מערכת ומחק הכל לחלוטין
+              </button>
+            </div>
+            
+          </div>
+        </div>
+        
+      </main>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       מודל: הוספה / עריכת חשבון (Add/Edit Modal)
+       ========================================== -->
+  <div class="modal-overlay" id="accountModal" style="display: none;">
+    <div class="modal-container glass-panel">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle">הוספת חשבון גוגל חדש</h3>
+        <button class="modal-close-btn" onclick="closeModal()">✕</button>
+      </div>
+      
+      <div class="modal-layout">
+        
+        <!-- טור 1: שדות הטופס (מילוי פרטים) -->
+        <form id="accountForm" onsubmit="handleAccountFormSubmit(event)" class="modal-form-column">
+          <input type="hidden" id="accountEditId">
+          
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label for="accName">שם החשבון (לדוגמה: חשבון 1):</label>
+            <input type="text" id="accName" placeholder="הקלד שם מזהה קל לחשבון..." required>
+            <span class="input-icon">🏷️</span>
+          </div>
+          
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label for="accEmail">כתובת אימייל של גוגל (אופציונלי):</label>
+            <input type="email" id="accEmail" placeholder="username@gmail.com">
+            <span class="input-icon">📧</span>
+          </div>
+          
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label for="accSecret">מפתח סודי של גוגל (Base32 Secret):</label>
+            <input type="text" id="accSecret" placeholder="הקלד או הדבק את המפתח הסודי בגוגל..." required pattern="^[a-zA-Z2-7\s=]+$">
+            <span class="input-icon">🔑</span>
+          </div>
+          
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label for="accNotes">הערות לחשבון:</label>
+            <textarea id="accNotes" placeholder="הקלד הערות ספציפיות לחשבון (שלוחה טלפונית, שאלות אבטחה וכדומה)..." rows="2"></textarea>
+          </div>
+          
+          <!-- תיבה נפתחת אופציונלית לקודי הגיבוי כדי לפשט את הממשק -->
+          <button type="button" class="toggle-details-btn" id="toggleBackupCodesBtn" onclick="toggleBackupCodesInput()" style="margin-top: 5px;">
+            <span>➕ הוספת 10 קודי גיבוי לחשבון (אופציונלי)</span>
+          </button>
+          
+          <div class="modal-backup-codes-container" id="modalBackupCodesContainer">
+            <!-- העלאת קובץ קודי גיבוי קל ומהיר -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; background: rgba(109, 40, 217, 0.05); padding: 12px; border-radius: 8px; border: 1px dashed rgba(109, 40, 217, 0.2);">
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <button type="button" class="btn-secondary" style="padding: 8px 14px; font-size: 13px; font-weight: 700; width: auto; background: #fff;" onclick="triggerBackupCodesUpload()">
+                  📥 טען קובץ גיבוי (TXT)
+                </button>
+                <input type="file" id="backupCodesFileInput" style="display: none;" accept=".txt" onchange="handleBackupCodesUpload(event)">
+                <span class="input-help" style="margin-top: 0; font-size: 11.5px; color: var(--text-muted);">העלה את קובץ הגיבוי שגוגל נותנת להורדה</span>
+              </div>
+            </div>
+            
+            <div class="modal-codes-input-grid">
+              <input type="text" id="backupCode1" placeholder="קוד גיבוי 1" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode2" placeholder="קוד גיבוי 2" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode3" placeholder="קוד גיבוי 3" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode4" placeholder="קוד גיבוי 4" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode5" placeholder="קוד גיבוי 5" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode6" placeholder="קוד גיבוי 6" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode7" placeholder="קוד גיבוי 7" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode8" placeholder="קוד גיבוי 8" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode9" placeholder="קוד גיבוי 9" maxlength="11" pattern="^[0-9\s]*$">
+              <input type="text" id="backupCode10" placeholder="קוד גיבוי 10" maxlength="11" pattern="^[0-9\s]*$">
+            </div>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="closeModal()">ביטול</button>
+            <button type="submit" class="btn-submit" style="margin-top: 0; width: auto; padding: 10px 24px;" id="modalSubmitBtn">שמור חשבון ✨</button>
+          </div>
+        </form>
+        
+        <!-- טור 2: מדריך עזר אינטראקטיבי דינמי -->
+        <div class="modal-guide-column">
+          
+          <!-- שלב ברירת מחדל: ברוכים הבאים -->
+          <div class="modal-guide-step active" id="modalGuide_welcome">
+            <div class="modal-guide-step-title">💡 הדרכה מהירה בטופס</div>
+            <p class="input-help" style="font-size: 13px; line-height: 1.6;">
+              לחץ על שדה כלשהו בטופס הימני (שם, מפתח סודי, הערות או קודי גיבוי), וכאן יופיע מיד הסבר מפורט יחד עם צילום מסך מתוך הגדרות גוגל שיסביר לך מה לעשות!
+            </p>
+          </div>
+          
+          <!-- שלב 1: שם החשבון -->
+          <div class="modal-guide-step" id="modalGuide_name">
+            <div class="modal-guide-step-title">🏷️ שם החשבון ואימייל</div>
+            <p class="input-help" style="font-size: 13px; line-height: 1.6;">
+              רשום שם קצר ונוח לחשבון (לדוגמה: "חשבון 1" או "אימייל עבודה"). מומלץ גם להזין את כתובת האימייל של החשבון בשדה השני כדי לדעת תמיד למי הוא שייך.
+            </p>
+          </div>
+          
+                    <!-- שלב 2: מפתח סודי של גוגל -->
+          <div class="modal-guide-step" id="modalGuide_secret">
+            <div class="modal-guide-step-title">🔑 קבלת מפתח האימות מגוגל</div>
+            <p class="input-help" style="font-size: 13px; line-height: 1.6; margin-bottom: 8px;">
+              בחר שלב לצפייה במדריך המצולם:
+            </p>
+            
+            <div class="ss-tabs">
+              <button type="button" class="ss-tab active" onclick="switchSSTab(this, 'sec_ss1')">1. אימות דו-שלבי</button>
+              <button type="button" class="ss-tab" onclick="switchSSTab(this, 'sec_ss2')">2. מספר טלפון</button>
+              <button type="button" class="ss-tab" onclick="switchSSTab(this, 'sec_ss3')">3. הוספת מאמת</button>
+              <button type="button" class="ss-tab" onclick="switchSSTab(this, 'sec_ss4')">4. הגדרת מאמת</button>
+              <button type="button" class="ss-tab" onclick="switchSSTab(this, 'sec_ss5')">5. לא מצליח לסרוק</button>
+              <button type="button" class="ss-tab" onclick="switchSSTab(this, 'sec_ss6')">6. העתקת מפתח</button>
+              <button type="button" class="ss-tab" onclick="switchSSTab(this, 'sec_ss7')">7. הזנת קוד</button>
+              <button type="button" class="ss-tab" onclick="switchSSTab(this, 'sec_ss8')">8. הפעלה סופית</button>
+            </div>
+            
+            <!-- שלב 1 -->
+            <div class="ss-content active" id="sec_ss1">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">בחשבון גוגל שלך (<a href="https://myaccount.google.com/security" target="_blank">בקישור זה</a>), תחת "איך נכנסים לגוגל", לחץ על <strong>אימות דו-שלבי</strong>.</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/הפעלת אימות דו שלבי.png" alt="הפעלת אימות דו שלבי" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+            
+            <!-- שלב 2 -->
+            <div class="ss-content" id="sec_ss2">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">גוגל תבקש להוסיף מספר טלפון לאימות (ניתן גם לדלג במידה והחשבון כבר מאומת).</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/הוספת מספר טלפון.png" alt="הוספת מספר טלפון" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+              <div class="modal-guide-img" style="margin-top: 8px;">
+                <img src="תמונות מסך/דילוג על הוספת המספר טלפון.png" alt="דילוג על מספר טלפון" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+            
+            <!-- שלב 3 -->
+            <div class="ss-content" id="sec_ss3">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">בדף האימות הדו-שלבי, גלול מטה ולחץ על <strong>אפליקציית מאמת (Authenticator app)</strong>.</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/כניסה להוספת אפליקציה לאימות חשבונות.png" alt="כניסה להוספת אפליקציה" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+            
+            <!-- שלב 4 -->
+            <div class="ss-content" id="sec_ss4">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">לחץ על הכפתור הכחול <strong>הגדרת מאמת (Set up authenticator)</strong>.</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/הגדרת מאמת חשבונות.png" alt="הגדרת מאמת חשבונות" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+            
+            <!-- שלב 5 -->
+            <div class="ss-content" id="sec_ss5">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">מכיוון שאנו עובדים במחשב ולא בנייד, לחץ על <strong>לא מצליח לסרוק את הברקוד? (Can't scan it?)</strong> שמתחת לברקוד.</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/לא הצלחת לסרוק את הקוד.png" alt="לא הצלחת לסרוק את הקוד" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+            
+            <!-- שלב 6 -->
+            <div class="ss-content" id="sec_ss6">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">גוגל תציג את <strong>המפתח הסודי (אותיות ומספרים)</strong>. העתק אותו והדבק אותו בשדה "מפתח סודי של גוגל" בטופס כאן מימין.</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/הקוד להעתיק מגוגל.png" alt="הקוד להעתיק מגוגל" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+            
+            <!-- שלב 7 -->
+            <div class="ss-content" id="sec_ss7">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">לאחר שמירה באפליקציה, לחץ על "הבא" בגוגל, והזן את <strong>קוד ה-6 ספרות</strong> שהתוכנה שלנו מייצרת כעת עבור החשבון.</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/הקלדת הוקד מאפליקציה מגוגל.png" alt="הקלדת הקוד מאפליקציה" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+            
+            <!-- שלב 8 -->
+            <div class="ss-content" id="sec_ss8">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">זהו זה! האימות הדו-שלבי מופעל כעת בהצלחה ומקושר לתוכנה.</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/הפעלת אימות דו שלבי לאחר הגדרת האפליקציה.png" alt="הפעלת אימות דו שלבי סופית" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+          </div>
+          
+          <!-- שלב 3: הערות לחשבון -->
+          <div class="modal-guide-step" id="modalGuide_notes">
+            <div class="modal-guide-step-title">📝 הערות חופשיות</div>
+            <p class="input-help" style="font-size: 13px; line-height: 1.6;">
+              רשום כאן פרטים נוספים שיעזרו לך לזכור פרטים חשובים על החשבון (כגון: "שלוחה 2 בטלפון", "שאלת אבטחה: שם אימי הוא...", "שייך לחשבון עבודה וכו'").
+            </p>
+          </div>
+          
+                    <!-- שלב 4: קודי גיבוי -->
+          <div class="modal-guide-step" id="modalGuide_backup">
+            <div class="modal-guide-step-title">🔐 קודי גיבוי חירום (אופציונלי)</div>
+            <p class="input-help" style="font-size: 13px; line-height: 1.6; margin-bottom: 8px;">
+              בחר שלב לצפייה במדריך המצולם:
+            </p>
+            
+            <div class="ss-tabs">
+              <button type="button" class="ss-tab active" onclick="switchSSTab(this, 'back_ss1')">1. קבלת קודים</button>
+              <button type="button" class="ss-tab" onclick="switchSSTab(this, 'back_ss2')">2. רשימת קודים</button>
+            </div>
+            
+            <!-- שלב 1 -->
+            <div class="ss-content active" id="back_ss1">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">בדף האימות הדו-שלבי, גלול מטה ולחץ על <strong>קודי גיבוי (Backup codes)</strong> כדי להפיק רשימת קודים.</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/לקבלת קודי גיבוי.png" alt="לקבלת קודי גיבוי" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+            
+            <!-- שלב 2 -->
+            <div class="ss-content" id="back_ss2">
+              <p class="input-help" style="font-size: 12.5px; margin-top: 5px;">לחץ על <strong>הורד קודים</strong> כדי לקבל קובץ טקסט עם 10 קודים. תוכל להעלות את קובץ הטקסט ישירות לכאן בלחצן "טען קובץ גיבוי"!</p>
+              <div class="modal-guide-img">
+                <img src="תמונות מסך/הורדת הקודי גיבוי.png" alt="הורדת קודי גיבוי" class="modal-guide-img" style="margin-top: 0; border: none;">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       חלק קוד הלוגיקה והקריפטוגרפיה (JavaScript)
+       ========================================== -->
+    <script>
+    
+    // ----------------------------------------------------
+    // כתובת ה-Web App של שרת הגיבוי המרכזי של מפתח התוכנה
+    // ----------------------------------------------------
+    const DEVELOPER_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8HA3YCdesH9x3xDmE8ybUynTB-9yEYzJ7gCt5rShNmRBJgT29HLvszP0JE1L-5eRqGg/exec";
+    
+    // ----------------------------------------------------
+    // א. משתנים גלובליים ונתונים בזיכרון (Memory State)
+    // ----------------------------------------------------
+    let accounts = []; // רשימת החשבונות המפוענחת במהלך הסשן
+    let sessionKey = null; // מפתח ה-AES-GCM המיוצר מסיסמת המשתמש (נשמר בזיכרון בלבד!)
+    let currentVault = null; // אובייקט הכספת הפעיל שנטען מהענן
+    let currentEmail = ""; // אימייל המשתמש המחובר כעת
+    let currentPasswordHash = ""; // האש סיסמת המאסטר לביצוע פעולות כתיבה מול השרת
+    let currentTab = 'accounts'; // הכרטיסייה הנוכחית בלוח הבקרה
+    let totpInterval = null; // מזהה טיימר הרענון של ה-TOTP
+    let countdownInterval = null; // מזהה טיימר רענון מונה השניות
+    let backupCodesExpanded = false; // מצב פתיחת אזור קודי הגיבוי במודל
+
+    // ----------------------------------------------------
+    // ב. אלגוריתם TOTP ו-HMAC-SHA1 ב-JS טהור (Vanilla Crypto)
+    // ----------------------------------------------------
+    
+    // מפענח מחרוזת Base32 למערך בייטים (Base32 to Uint8Array Decoder)
+    function base32ToBytes(str) {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      str = str.replace(/=+$/, '').toUpperCase().replace(/\s/g, '');
+      let bits = 0;
+      let value = 0;
+      const bytes = [];
+      
+      for (let i = 0; i < str.length; i++) {
+        const val = alphabet.indexOf(str[i]);
+        if (val === -1) {
+          throw new Error("תו אוקטלי/Base32 לא חוקי: " + str[i]);
+        }
+        value = (value << 5) | val;
+        bits += 5;
+        if (bits >= 8) {
+          bytes.push((value >> (bits - 8)) & 255);
+          bits -= 8;
+        }
+      }
+      return new Uint8Array(bytes);
+    }
+
+    // חישוב SHA-1 פנימי ומערך בייטים (Internal SHA-1 function)
+    function sha1Raw(bytes) {
+      const words = [];
+      const len = bytes.length;
+      for (let i = 0; i < len; i++) {
+        words[i >> 2] |= bytes[i] << (24 - (i % 4) * 8);
+      }
+      
+      const totalBits = len * 8;
+      words[len >> 2] |= 0x80 << (24 - (len % 4) * 8);
+      
+      const wordCount = ((len + 8) >> 6) * 16 + 14;
+      while (words.length < wordCount) {
+        words.push(0);
+      }
+      
+      words.push(0); // SHA-1 bit length fits in 32-bit for normal sizes
+      words.push(totalBits);
+      
+      let h0 = 0x67452301;
+      let h1 = 0xefcdab89;
+      let h2 = 0x98badcfe;
+      let h3 = 0x10325476;
+      let h4 = 0xc3d2e1f0;
+      
+      const w = new Int32Array(80);
+      
+      for (let i = 0; i < words.length; i += 16) {
+        for (let j = 0; j < 16; j++) {
+          w[j] = words[i + j];
+        }
+        for (let j = 16; j < 80; j++) {
+          const val = w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16];
+          w[j] = (val << 1) | (val >>> 31);
+        }
+        
+        let a = h0;
+        let b = h1;
+        let c = h2;
+        let d = h3;
+        let e = h4;
+        
+        for (let j = 0; j < 80; j++) {
+          let f, k;
+          if (j < 20) {
+            f = (b & c) | (~b & d);
+            k = 0x5a827999;
+          } else if (j < 40) {
+            f = b ^ c ^ d;
+            k = 0x6ed9eba1;
+          } else if (j < 60) {
+            f = (b & c) | (b & d) | (c & d);
+            k = 0x8f1bbcdc;
+          } else {
+            f = b ^ c ^ d;
+            k = 0xca62c1d6;
+          }
+          
+          const temp = ((a << 5) | (a >>> 27)) + f + e + k + w[j];
+          e = d;
+          d = c;
+          c = (b << 30) | (b >>> 2);
+          b = a;
+          a = temp | 0;
+        }
+        
+        h0 = (h0 + a) | 0;
+        h1 = (h1 + b) | 0;
+        h2 = (h2 + c) | 0;
+        h3 = (h3 + d) | 0;
+        h4 = (h4 + e) | 0;
+      }
+      
+      const result = new Uint8Array(20);
+      const writeWord = (w, offset) => {
+        result[offset] = (w >>> 24) & 0xff;
+        result[offset + 1] = (w >>> 16) & 0xff;
+        result[offset + 2] = (w >>> 8) & 0xff;
+        result[offset + 3] = w & 0xff;
+      };
+      writeWord(h0, 0);
+      writeWord(h1, 4);
+      writeWord(h2, 8);
+      writeWord(h3, 12);
+      writeWord(h4, 16);
+      
+      return result;
+    }
+
+    // חישוב HMAC-SHA1
+    function hmacSha1(keyBytes, messageBytes) {
+      let key = new Uint8Array(64);
+      if (keyBytes.length > 64) {
+        key = sha1Raw(keyBytes);
+      } else {
+        key.set(keyBytes);
+      }
+      
+      const oKeyPad = new Uint8Array(64);
+      const iKeyPad = new Uint8Array(64);
+      for (let i = 0; i < 64; i++) {
+        oKeyPad[i] = key[i] ^ 0x5c;
+        iKeyPad[i] = key[i] ^ 0x36;
+      }
+      
+      const innerMessage = new Uint8Array(64 + messageBytes.length);
+      innerMessage.set(iKeyPad);
+      innerMessage.set(messageBytes, 64);
+      const innerHash = sha1Raw(innerMessage);
+      
+      const outerMessage = new Uint8Array(64 + innerHash.length);
+      outerMessage.set(oKeyPad);
+      outerMessage.set(innerHash, 64);
+      
+      return sha1Raw(outerMessage);
+    }
+
+    // מחולל קוד ה-TOTP הראשי בהתבסס על השעון ועל המפתח הסודי
+    function generateTotp(secret) {
+      try {
+        const keyBytes = base32ToBytes(secret);
+        const epoch = Math.floor(Date.now() / 1000);
+        const timeStep = Math.floor(epoch / 30);
+        
+        // המרת הזמן למערך 8 בייטים Big-endian
+        const messageBytes = new Uint8Array(8);
+        let temp = timeStep;
+        for (let i = 7; i >= 0; i--) {
+          messageBytes[i] = temp & 0xff;
+          temp = Math.floor(temp / 256);
+        }
+        
+        const hmacResult = hmacSha1(keyBytes, messageBytes);
+        
+        // Truncation דינמי
+        const offset = hmacResult[19] & 0xf;
+        const binCode = ((hmacResult[offset] & 0x7f) << 24) |
+                        ((hmacResult[offset + 1] & 0xff) << 16) |
+                        ((hmacResult[offset + 2] & 0xff) << 8) |
+                        (hmacResult[offset + 3] & 0xff);
+                        
+        const otp = binCode % 1000000;
+        let strOtp = otp.toString();
+        while (strOtp.length < 6) {
+          strOtp = '0' + strOtp;
+        }
+        return strOtp;
+      } catch (e) {
+        return "שגיאה";
+      }
+    }
+
+    // ----------------------------------------------------
+    // ג. מנגנון הצפנה מאובטח ברמת לקוח (PBKDF2 + AES-GCM)
+    // ----------------------------------------------------
+    
+    // יצירת מפתח AES מתוך סיסמה ומלח (Salt)
+    async function deriveKey(password, salt) {
+      const enc = new TextEncoder();
+      const passwordKey = await window.crypto.subtle.importKey(
+        "raw",
+        enc.encode(password),
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+      );
+      return window.crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: 100000,
+          hash: "SHA-256"
+        },
+        passwordKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    // הצפנת טקסט (פיצול tag ו-ciphertext תואם ל-C#)
+    async function encryptText(text, key) {
+      const enc = new TextEncoder();
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        key,
+        enc.encode(text)
+      );
+      
+      const encryptedBytes = new Uint8Array(encrypted);
+      const ciphertextBytes = encryptedBytes.slice(0, encryptedBytes.length - 16);
+      const tagBytes = encryptedBytes.slice(encryptedBytes.length - 16);
+      
+      return {
+        ciphertext: btoa(String.fromCharCode(...ciphertextBytes)),
+        iv: btoa(String.fromCharCode(...iv)),
+        tag: btoa(String.fromCharCode(...tagBytes))
+      };
+    }
+
+    // פענוח טקסט (חיבור tag ו-ciphertext תואם ל-C#)
+    async function decryptText(ciphertextBase64, ivBase64, tagBase64, key) {
+      const dec = new TextDecoder();
+      const ciphertextBytes = new Uint8Array(atob(ciphertextBase64).split("").map(c => c.charCodeAt(0)));
+      const ivBytes = new Uint8Array(atob(ivBase64).split("").map(c => c.charCodeAt(0)));
+      const tagBytes = new Uint8Array(atob(tagBase64).split("").map(c => c.charCodeAt(0)));
+      
+      const combined = new Uint8Array(ciphertextBytes.length + tagBytes.length);
+      combined.set(ciphertextBytes);
+      combined.set(tagBytes, ciphertextBytes.length);
+      
+      const decrypted = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: ivBytes },
+        key,
+        combined
+      );
+      return dec.decode(decrypted);
+    }
+
+    // הפקת האש SHA-256 תואם C# (עבור אימות סיסמה מול השרת)
+    async function sha256(message) {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return btoa(String.fromCharCode.apply(null, hashArray));
+    }
+
+    // אתחול כספת מוצפנת חדשה
+    async function initializeNewVault(password, email) {
+      const salt = window.crypto.getRandomValues(new Uint8Array(16));
+      const key = await deriveKey(password, salt);
+      
+      const tokenEnc = await encryptText("AUTHENTICATED", key);
+      const accountsEnc = await encryptText(JSON.stringify([]), key);
+      
+      return {
+        Salt: btoa(String.fromCharCode(...salt)),
+        VerificationTokenEncrypted: tokenEnc.ciphertext,
+        VerificationTokenIv: tokenEnc.iv,
+        VerificationTokenTag: tokenEnc.tag,
+        AccountsEncrypted: accountsEnc.ciphertext,
+        AccountsIv: accountsEnc.iv,
+        AccountsTag: accountsEnc.tag,
+        RecoveryEmail: email
+      };
+    }
+
+    // ----------------------------------------------------
+    // ד. ממשק משתמש וטוסטים (UI & Toast Utilities)
+    // ----------------------------------------------------
+    function showToast(message, type = "success") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      
+      let icon = "🔔";
+      if (type === "success") icon = "✅";
+      if (type === "error") icon = "❌";
+      if (type === "warning") icon = "⚠️";
+      if (type === "info") icon = "ℹ️";
+      
+      toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.animation = "fadeIn 0.3s ease reverse forwards";
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // מעבר בין מסכים ראשיים
+    function showScreen(screenId) {
+      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+      document.getElementById(screenId).classList.add("active");
+    }
+
+    // שינוי הדרכה פעילה במודל לפי הטאב הנבחר (צילומי מסך)
+    function switchSSTab(btn, contentId) {
+      const parent = btn.closest('.modal-guide-step');
+      parent.querySelectorAll('.ss-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      
+      parent.querySelectorAll('.ss-content').forEach(c => c.classList.remove('active'));
+      parent.querySelector('#' + contentId).classList.add('active');
+    }
+
+    // טריגר להעלאת קובץ קודי הגיבוי
+    function triggerBackupCodesUpload() {
+      document.getElementById("backupCodesFileInput").click();
+    }
+
+    // מפענח קודי גיבוי מקובץ הטקסט שגוגל מספקת להורדה
+    function parseGoogleBackupCodes(text) {
+      const regex = /\d{4}\s?\d{4}|\d{8}/g;
+      const matches = text.match(regex) || [];
+      return matches.map(code => code.replace(/\s/g, '')).slice(0, 10);
+    }
+
+    // טיפול בבחירת קובץ קודי גיבוי
+    function handleBackupCodesUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const codes = parseGoogleBackupCodes(text);
+        
+        if (codes.length === 0) {
+          showToast("לא נמצאו קודי גיבוי תקינים בקובץ הטקסט!", "error");
+          return;
+        }
+        
+        const container = document.getElementById("modalBackupCodesContainer");
+        const btn = document.getElementById("toggleBackupCodesBtn");
+        backupCodesExpanded = true;
+        container.style.display = "flex";
+        btn.querySelector("span").innerText = "➖ הסתרת קודי גיבוי לחשבון (אופציונלי)";
+        
+        for (let i = 1; i <= 10; i++) {
+          const input = document.getElementById(`backupCode${i}`);
+          if (codes[i - 1]) {
+            input.value = codes[i - 1];
+          } else {
+            input.value = "";
+          }
+        }
+        
+        showToast(`נטענו בהצלחה ${codes.length} קודי גיבוי מתוך הקובץ!`, "success");
+        event.target.value = "";
+      };
+      reader.readAsText(file);
+    }
+
+    // בדיקה ראשונית של המצב בעת פתיחת הדף
+    window.addEventListener("load", async () => {
+      initModalGuideListeners();
+      showScreen("lockScreen");
+      document.getElementById("lockEmail").focus();
+      updateSyncBadgeStatus();
+    });
+
+    // קישור מאזינים להדרכה דינמית בטופס
+    function initModalGuideListeners() {
+      document.getElementById("accName").addEventListener("focus", () => showModalGuide("name"));
+      document.getElementById("accEmail").addEventListener("focus", () => showModalGuide("name"));
+      document.getElementById("accSecret").addEventListener("focus", () => showModalGuide("secret"));
+      document.getElementById("accNotes").addEventListener("focus", () => showModalGuide("notes"));
+      
+      for (let i = 1; i <= 10; i++) {
+        document.getElementById(`backupCode${i}`).addEventListener("focus", () => showModalGuide("backup"));
+      }
+    }
+
+    // שינוי הדרכה פעילה במודל
+    function showModalGuide(stepKey) {
+      document.querySelectorAll(".modal-guide-step").forEach(step => {
+        step.classList.remove("active");
+      });
+      const targetStep = document.getElementById(`modalGuide_${stepKey}`);
+      if (targetStep) {
+        targetStep.classList.add("active");
+      }
+    }
+
+    // התחברות או יצירת חשבון ענן (Login & Connection Flow)
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const email = document.getElementById("lockEmail").value.trim().toLowerCase();
+      const password = document.getElementById("lockPassword").value;
+      
+      if (!email || !email.includes("@")) {
+        showToast("אנא הזן כתובת אימייל תקינה!", "error");
+        return;
+      }
+      
+      if (password.length < 4) {
+        showToast("הסיסמה חייבת להיות באורך 4 תווים לפחות!", "error");
+        return;
+      }
+      
+      showToast("מתחבר לשרת הגיבוי... נא להמתין", "info");
+      
+      try {
+        const response = await fetch(DEVELOPER_SCRIPT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            action: "get_vault",
+            email: email
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!result || !result.success) {
+          showToast(result && result.message ? result.message : "שגיאה בקבלת נתונים מהשרת!", "error");
+          return;
+        }
+        
+        if (result.registered) {
+          // משתמש קיים - טוענים ומפענחים
+          if (!result.vault) {
+            showToast("הכספת בענן ריקה או פגומה!", "error");
+            return;
+          }
+          
+          const vault = JSON.parse(result.vault);
+          const salt = new Uint8Array(atob(vault.Salt).split("").map(c => c.charCodeAt(0)));
+          const key = await deriveKey(password, salt);
+          
+          try {
+            const tokenDecrypted = await decryptText(
+              vault.VerificationTokenEncrypted,
+              vault.VerificationTokenIv,
+              vault.VerificationTokenTag,
+              key
+            );
+            
+            if (tokenDecrypted === "AUTHENTICATED") {
+              sessionKey = key;
+              currentVault = vault;
+              currentEmail = email;
+              currentPasswordHash = await sha256(password);
+              
+              // פענוח החשבונות
+              const accountsJson = await decryptText(
+                vault.AccountsEncrypted,
+                vault.AccountsIv,
+                vault.AccountsTag,
+                key
+              );
+              accounts = JSON.parse(accountsJson);
+              
+              showToast("ברוך הבא! נעילת המאמת נפתחה בהצלחה.", "success");
+              showScreen("dashboardScreen");
+              initDashboard();
+            } else {
+              showToast("סיסמת המאסטר שגויה. נסה שנית!", "error");
+            }
+          } catch (decErr) {
+            showToast("סיסמת המאסטר שגויה. נסה שנית!", "error");
+          }
+        } else {
+          // מייל לא רשום
+          const registerResult = confirm(`כתובת האימייל ${email} אינה רשומה בענן.\n\nהאם ברצונך ליצור כספת מאובטחת חדשה עבור אימייל זה עם הסיסמה שהזנת?`);
+          if (registerResult) {
+            const confirmP = prompt("אנא הקלד שוב את סיסמת המאסטר שקבעת לצורך אימות:");
+            if (!confirmP) return;
+            if (password !== confirmP) {
+              showToast("הסיסמאות אינן תואמות! תהליך הרישום בוטל.", "error");
+              return;
+            }
+            
+            showToast("יוצר חשבון בענן... נא להמתין", "info");
+            const newVault = await initializeNewVault(password, email);
+            const pHash = await sha256(password);
+            
+            const saveResp = await fetch(DEVELOPER_SCRIPT_URL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                action: "save_vault",
+                email: email,
+                password: pHash,
+                vault: JSON.stringify(newVault)
+              })
+            });
+            const saveRes = await saveResp.json();
+            
+            if (saveRes && saveRes.success) {
+              sessionKey = await deriveKey(password, new Uint8Array(atob(newVault.Salt).split("").map(c => c.charCodeAt(0))));
+              currentVault = newVault;
+              currentEmail = email;
+              currentPasswordHash = pHash;
+              accounts = [];
+              
+              showToast("חשבון ענן חדש נוצר וסונכרן בהצלחה!", "success");
+              showScreen("dashboardScreen");
+              initDashboard();
+            } else {
+              showToast(saveRes && saveRes.message ? saveRes.message : "שגיאה ביצירת חשבון בענן!", "error");
+            }
+          }
+        }
+      } catch (err) {
+        showToast("שגיאת תקשורת: " + err.message, "error");
+      }
+    }
+
+    // מידע על אבטחת אפס ידע
+    function showForgotPasswordInfo(e) {
+      e.preventDefault();
+      alert("אבטחת אפס-ידע (Zero-Knowledge):\n\nהנתונים שלך מוצפנים בצורה מאובטחת במכשיר שלך (באמצעות AES-GCM) לפני העלאתם לענן. מפתח ההצפנה נגזר ישירות מסיסמת המאסטר שלך.\n\nשרת הגיבוי והרשת אינם יודעים ואינם שומרים את הסיסמה שלך בטקסט קריא. לכן, אם שכחת את סיסמת המאסטר שלך, לא ניתן לשחזר אותה או את הנתונים שלך.\n\nנא לשמור על סיסמת המאסטר שלך היטב במקום בטוח!");
+    }
+
+    // נעילת האפליקציה (Logout/Lock App)
+    function lockApp() {
+      sessionKey = null;
+      accounts = [];
+      currentVault = null;
+      currentEmail = "";
+      currentPasswordHash = "";
+      document.getElementById("lockPassword").value = "";
+      if (totpInterval) clearInterval(totpInterval);
+      if (countdownInterval) clearInterval(countdownInterval);
+      showScreen("lockScreen");
+      showToast("האפליקציה ננעלה בהצלחה.", "info");
+      updateSyncBadgeStatus();
+    }
+
+    // ----------------------------------------------------
+    // ו. ניהול בסיס הנתונים המוצפן וסנכרון לענן (Sync & Storage)
+    // ----------------------------------------------------
+    
+    // שמירה לענן ועדכון
+    async function saveAccountsToStorage() {
+      if (!sessionKey || !currentVault) return;
+      try {
+        const jsonText = JSON.stringify(accounts);
+        const encrypted = await encryptText(jsonText, sessionKey);
+        
+        currentVault.AccountsEncrypted = encrypted.ciphertext;
+        currentVault.AccountsIv = encrypted.iv;
+        currentVault.AccountsTag = encrypted.tag;
+        
+        await syncVaultToCloud();
+      } catch (err) {
+        showToast("שגיאה בשמירת הנתונים המוצפנים: " + err.message, "error");
+      }
+    }
+
+    // סנכרון בפועל
+    async function syncVaultToCloud() {
+      if (!currentVault || !currentEmail) return;
+      try {
+        const response = await fetch(DEVELOPER_SCRIPT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            action: "save_vault",
+            email: currentEmail,
+            password: currentPasswordHash,
+            vault: JSON.stringify(currentVault)
+          })
+        });
+        const result = await response.json();
+        if (result && result.success) {
+          showToast("השינויים סונכרנו בהצלחה בענן! ☁️", "success");
+        } else {
+          showToast(result && result.message ? result.message : "שגיאה בסנכרון השינויים לענן!", "error");
+        }
+      } catch (e) {
+        showToast("שגיאת סנכרון לענן: " + e.message, "error");
+      }
+    }
+
+    // עדכון תג החיבור בראש הדף
+    function updateSyncBadgeStatus() {
+      const badge = document.getElementById("syncStatus");
+      const text = document.getElementById("syncStatusText");
+      
+      if (sessionKey && currentVault) {
+        badge.classList.remove("disconnected");
+        text.innerText = "מחובר ומסונכרן לענן ☁️";
+      } else {
+        badge.classList.add("disconnected");
+        text.innerText = "הכספת נעולה 🔒";
+      }
+    }
+
+    // ----------------------------------------------------
+    // ח. לוגיקת לוח הבקרה ורענון הקודים (Dashboard Logic)
+    // ----------------------------------------------------
+    
+    function initDashboard() {
+      updateSyncBadgeStatus();
+      switchTab('accounts');
+      
+      if (totpInterval) clearInterval(totpInterval);
+      if (countdownInterval) clearInterval(countdownInterval);
+      
+      totpInterval = setInterval(updateCodesDisplay, 1000);
+      updateCodesDisplay();
+    }
+
+    // החלפת כרטיסיות בלוח הניהול
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll(".nav-tab-btn").forEach(btn => btn.classList.remove("active"));
+      
+      document.getElementById("accountsView").style.display = "none";
+      document.getElementById("settingsView").classList.remove("active");
+      document.getElementById("guideView").style.display = "none";
+      
+      if (tab === 'accounts') {
+        document.getElementById("tabBtnAccounts").classList.add("active");
+        document.getElementById("accountsView").style.display = "flex";
+        renderAccounts();
+      } else if (tab === 'settings') {
+        document.getElementById("tabBtnSettings").classList.add("active");
+        document.getElementById("settingsView").classList.add("active");
+        loadSettingsData();
+      } else if (tab === 'guide') {
+        document.getElementById("tabBtnGuide").classList.add("active");
+        document.getElementById("guideView").style.display = "flex";
+      }
+    }
+
+    // רענון עדכון קודים וטיימרים
+    function updateCodesDisplay() {
+      if (currentTab !== 'accounts') return;
+      
+      const epoch = Math.floor(Date.now() / 1000);
+      const remainingSeconds = 30 - (epoch % 30);
+      
+      const radius = 15;
+      const circumference = 2 * Math.PI * radius; // ~94.24
+      const offset = circumference - (remainingSeconds / 30) * circumference;
+      
+      let strokeColor = "var(--color-success)";
+      if (remainingSeconds <= 15 && remainingSeconds > 5) {
+        strokeColor = "var(--color-warning)";
+      } else if (remainingSeconds <= 5) {
+        strokeColor = "var(--color-danger)";
+      }
+      
+      accounts.forEach(acc => {
+        const card = document.getElementById(`accCard_${acc.id}`);
+        if (!card) return;
+        
+        const codeElement = card.querySelector(".totp-code");
+        if (codeElement) {
+          const currentOtp = generateTotp(acc.secret);
+          const formattedCode = currentOtp.slice(0, 3) + " " + currentOtp.slice(3);
+          if (codeElement.innerText.replace(/\s/g, '') !== currentOtp) {
+            codeElement.innerText = formattedCode;
+          }
+        }
+        
+        const timerCircle = card.querySelector(".timer-circle");
+        const timerText = card.querySelector(".timer-text");
+        
+        if (timerCircle) {
+          timerCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+          timerCircle.style.strokeDashoffset = offset;
+          timerCircle.style.stroke = strokeColor;
+        }
+        if (timerText) {
+          timerText.innerText = remainingSeconds;
+          timerText.style.color = strokeColor;
+        }
+      });
+    }
+
+    // רישום והצגת רשימת החשבונות (Render Accounts Grid)
+    function renderAccounts() {
+      const grid = document.getElementById("accountsGrid");
+      const searchVal = document.getElementById("searchInput").value.trim().toLowerCase();
+      
+      grid.innerHTML = "";
+      
+      const filtered = accounts.filter(acc => {
+        return acc.name.toLowerCase().includes(searchVal) || 
+               (acc.email && acc.email.toLowerCase().includes(searchVal)) ||
+               (acc.notes && acc.notes.toLowerCase().includes(searchVal));
+      });
+      
+      document.getElementById("accountsCountTitle").innerText = `חשבונות פעילים (${filtered.length})`;
+      
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state glass-panel" style="grid-column: 1 / -1;">
+            <div class="empty-icon">📂</div>
+            <div class="empty-title">אין חשבונות להצגה</div>
+            <div class="empty-desc">לא נמצאו חשבונות מתאימים. לחץ על "הוסף חשבון גוגל חדש" כדי להתחיל!</div>
+          </div>
+        `;
+        return;
+      }
+      
+      filtered.forEach(acc => {
+        const card = document.createElement("div");
+        card.id = `accCard_${acc.id}`;
+        card.className = "account-card glass-panel";
+        
+        let backupCodesHtml = "";
+        if (acc.backupCodes && acc.backupCodes.some(c => c && c.code)) {
+          backupCodesHtml = acc.backupCodes.map((codeObj, index) => {
+            if (!codeObj || !codeObj.code) return "";
+            const isUsed = codeObj.used ? "used" : "";
+            return `
+              <div class="backup-code-item ${isUsed}" id="backup_${acc.id}_${index}">
+                <span class="backup-code-text">${codeObj.code}</span>
+                <div class="backup-code-actions">
+                  <button class="btn-code-action use-toggle" onclick="toggleBackupCodeUsed('${acc.id}', ${index})" title="סמן כמשומש / לא משומש">
+                    ${codeObj.used ? '🔄' : '✔'}
+                  </button>
+                  <button class="btn-code-action" onclick="copyText('${codeObj.code}', 'קוד גיבוי הועתק!')" title="העתק קוד">
+                    📋
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join("");
+        } else {
+          backupCodesHtml = `<div class="input-help" style="grid-column: 1 / -1; text-align: center;">לא הוגדרו קודי גיבוי לחשבון זה.</div>`;
+        }
+        
+        card.innerHTML = `
+          <div class="card-top">
+            <div class="account-info">
+              <span class="account-label">${acc.name}</span>
+              ${acc.email ? `<span class="account-email">${acc.email}</span>` : ''}
+            </div>
+            
+            <div class="card-actions">
+              <button class="btn-action-small" onclick="openEditModal('${acc.id}')" title="ערוך חשבון">✏️</button>
+              <button class="btn-action-small delete" onclick="deleteAccount('${acc.id}')" title="מחק חשבון">🗑️</button>
+            </div>
+          </div>
+          
+          <div class="code-display-row" onclick="copyCurrentOtp('${acc.id}')" title="לחץ להעתקת קוד האימות">
+            <span class="totp-code">000 000</span>
+            
+            <div class="timer-container">
+              <svg class="timer-svg">
+                <circle class="timer-circle-bg" cx="18" cy="18" r="15" />
+                <circle class="timer-circle" cx="18" cy="18" r="15" />
+              </svg>
+              <span class="timer-text">30</span>
+            </div>
+          </div>
+          
+          <button class="toggle-details-btn" onclick="toggleCardDetails('${acc.id}')">
+            <span>הערות וקודי גיבוי</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          
+          <div class="card-details">
+            ${acc.notes ? `
+              <div class="detail-section">
+                <span class="detail-label">📝 הערות והנחיות:</span>
+                <div class="notes-box">${acc.notes}</div>
+              </div>
+            ` : ''}
+            
+            <div class="detail-section">
+              <span class="detail-label">🔐 קודי אבטחה וגיבוי (Google Backup Codes):</span>
+              <div class="backup-codes-grid">
+                ${backupCodesHtml}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        grid.appendChild(card);
+      });
+      
+      updateCodesDisplay();
+    }
+
+    // סינון חשבונות דינמי
+    function filterAccounts() {
+      renderAccounts();
+    }
+
+    // העתקת קוד האימות הראשי
+    function copyCurrentOtp(id) {
+      const acc = accounts.find(a => a.id === id);
+      if (!acc) return;
+      
+      const rawCode = generateTotp(acc.secret);
+      if (rawCode === "שגיאה") {
+        showToast("לא ניתן לחשב את הקוד. מפתח סודי לא תקין!", "error");
+        return;
+      }
+      
+      copyText(rawCode, "קוד האימות הועתק ללוח! 📋");
+      
+      const card = document.getElementById(`accCard_${id}`);
+      card.classList.add("copied");
+      setTimeout(() => card.classList.remove("copied"), 800);
+    }
+
+    // העתקת טקסט כללי ללוח
+    function copyText(text, successMessage) {
+      const cleanText = text.replace(/\s/g, ''); // הסרת רווחים
+      navigator.clipboard.writeText(cleanText).then(() => {
+        showToast(successMessage, "success");
+      }).catch(err => {
+        showToast("נכשל ניסיון העתקה!", "error");
+      });
+    }
+
+    // שינוי מצב שימוש בקוד גיבוי (Used/Unused)
+    async function toggleBackupCodeUsed(accId, codeIndex) {
+      const acc = accounts.find(a => a.id === accId);
+      if (!acc) return;
+      
+      acc.backupCodes[codeIndex].used = !acc.backupCodes[codeIndex].used;
+      
+      await saveAccountsToStorage();
+      renderAccounts();
+      showToast("מצב קוד הגיבוי עודכן בהצלחה.", "success");
+    }
+
+    // תצוגת הערות וקודי גיבוי של כרטיס ספציפי
+    function toggleCardDetails(id) {
+      const card = document.getElementById(`accCard_${id}`);
+      if (!card) return;
+      
+      card.classList.toggle("expanded");
+    }
+
+    // ----------------------------------------------------
+    // ט. לוגיקת טפסים ומודלים (Form & Modal Logic)
+    // ----------------------------------------------------
+    
+    // פתיחה/סגירה של קודי הגיבוי בתוך המודל
+    function toggleBackupCodesInput() {
+      const container = document.getElementById("modalBackupCodesContainer");
+      const btn = document.getElementById("toggleBackupCodesBtn");
+      
+      backupCodesExpanded = !backupCodesExpanded;
+      if (backupCodesExpanded) {
+        container.style.display = "flex";
+        btn.querySelector("span").innerText = "➖ הסתרת קודי גיבוי לחשבון (אופציונלי)";
+      } else {
+        container.style.display = "none";
+        btn.querySelector("span").innerText = "➕ הוספת 10 קודי גיבוי לחשבון (אופציונלי)";
+      }
+    }
+    
+    function resetBackupCodesInput() {
+      const container = document.getElementById("modalBackupCodesContainer");
+      const btn = document.getElementById("toggleBackupCodesBtn");
+      backupCodesExpanded = false;
+      container.style.display = "none";
+      btn.querySelector("span").innerText = "➕ הוספת 10 קודי גיבוי לחשבון (אופציונלי)";
+    }
+
+    function openAddModal() {
+      document.getElementById("modalTitle").innerText = "הוספת חשבון גוגל חדש";
+      document.getElementById("accountForm").reset();
+      document.getElementById("accountEditId").value = "";
+      document.getElementById("modalSubmitBtn").innerText = "שמור חשבון ✨";
+      
+      resetBackupCodesInput();
+      showModalGuide("welcome"); // הצגת הסבר ברוכים הבאים
+      
+      const modal = document.getElementById("accountModal");
+      modal.style.display = "flex";
+      modal.classList.add("active");
+    }
+
+    async function openEditModal(id) {
+      const acc = accounts.find(a => a.id === id);
+      if (!acc) return;
+      
+      document.getElementById("modalTitle").innerText = "עריכת חשבון גוגל";
+      document.getElementById("accountEditId").value = acc.id;
+      document.getElementById("accName").value = acc.name;
+      document.getElementById("accEmail").value = acc.email || "";
+      document.getElementById("accSecret").value = acc.secret;
+      document.getElementById("accNotes").value = acc.notes || "";
+      
+      let hasCodes = false;
+      for (let i = 1; i <= 10; i++) {
+        const input = document.getElementById(`backupCode${i}`);
+        if (acc.backupCodes && acc.backupCodes[i - 1] && acc.backupCodes[i - 1].code) {
+          input.value = acc.backupCodes[i - 1].code;
+          hasCodes = true;
+        } else {
+          input.value = "";
+        }
+      }
+      
+      const container = document.getElementById("modalBackupCodesContainer");
+      const btn = document.getElementById("toggleBackupCodesBtn");
+      if (hasCodes) {
+        backupCodesExpanded = true;
+        container.style.display = "flex";
+        btn.querySelector("span").innerText = "➖ הסתרת קודי גיבוי לחשבון (אופציונלי)";
+      } else {
+        resetBackupCodesInput();
+      }
+      
+      showModalGuide("welcome");
+      
+      document.getElementById("modalSubmitBtn").innerText = "עדכן שינויים 💾";
+      const modal = document.getElementById("accountModal");
+      modal.style.display = "flex";
+      modal.classList.add("active");
+    }
+
+    function closeModal() {
+      const modal = document.getElementById("accountModal");
+      modal.style.display = "none";
+      modal.classList.remove("active");
+    }
+
+    // שליחת טופס הוספה/עריכה
+    async function handleAccountFormSubmit(e) {
+      e.preventDefault();
+      
+      const id = document.getElementById("accountEditId").value;
+      const name = document.getElementById("accName").value.trim();
+      const email = document.getElementById("accEmail").value.trim();
+      const secret = document.getElementById("accSecret").value.replace(/\s/g, '').toUpperCase();
+      const notes = document.getElementById("accNotes").value.trim();
+      
+      try {
+        base32ToBytes(secret);
+      } catch (err) {
+        showToast("מפתח סודי שגוי! המפתח חייב להכיל רק אותיות A-Z ומספרים 2-7.", "error");
+        return;
+      }
+      
+      const backupCodes = [];
+      for (let i = 1; i <= 10; i++) {
+        const val = document.getElementById(`backupCode${i}`).value.trim();
+        if (val) {
+          let wasUsed = false;
+          if (id) {
+            const oldAcc = accounts.find(a => a.id === id);
+            if (oldAcc && oldAcc.backupCodes && oldAcc.backupCodes[i - 1]) {
+              if (oldAcc.backupCodes[i - 1].code === val) {
+                wasUsed = oldAcc.backupCodes[i - 1].used;
+              }
+            }
+          }
+          backupCodes.push({ code: val, used: wasUsed });
+        } else {
+          backupCodes.push({ code: "", used: false });
+        }
+      }
+      
+      if (id) {
+        const index = accounts.findIndex(a => a.id === id);
+        if (index !== -1) {
+          accounts[index] = { ...accounts[index], name, email, secret, notes, backupCodes };
+          showToast("החשבון עודכן בהצלחה!", "success");
+        }
+      } else {
+        const newAcc = {
+          id: Date.now().toString(),
+          name,
+          email,
+          secret,
+          notes,
+          backupCodes
+        };
+        accounts.push(newAcc);
+        showToast("חשבון חדש נוסף למערכת!", "success");
+      }
+      
+      await saveAccountsToStorage();
+      closeModal();
+      renderAccounts();
+    }
+
+    // מחיקת חשבון
+    async function deleteAccount(id) {
+      const acc = accounts.find(a => a.id === id);
+      if (!acc) return;
+      
+      const confirmDelete = confirm(`האם אתה בטוח שברצונך למחוק לחלוטין את החשבון "${acc.name}"?`);
+      if (confirmDelete) {
+        accounts = accounts.filter(a => a.id !== id);
+        await saveAccountsToStorage();
+        renderAccounts();
+        showToast("החשבון נמחק לצמיתות.", "info");
+      }
+    }
+
+    // ----------------------------------------------------
+    // י. ניהול מסך הגדרות (Settings Screen Logic)
+    // ----------------------------------------------------
+    
+    function loadSettingsData() {
+      document.getElementById("settingsEmail").value = currentEmail;
+    }
+
+    // שמירת הגדרות סינכרון ואימייל
+    async function handleSyncSave(e) {
+      e.preventDefault();
+      const email = document.getElementById("settingsEmail").value.trim().toLowerCase();
+      
+      if (!email || !email.includes("@")) {
+        showToast("נא להזין כתובת אימייל תקינה!", "error");
+        return;
+      }
+      
+      const oldEmail = currentVault.RecoveryEmail;
+      if (email === oldEmail) {
+        showToast("כתובת האימייל זהה לנוכחית.", "info");
+        return;
+      }
+      
+      const confirmChange = confirm(`האם ברצונך להעביר את הכספת לכתובת האימייל החדשה: ${email}?\n\nהכספת תישמר בענן תחת האימייל החדש.`);
+      if (confirmChange) {
+        currentVault.RecoveryEmail = email;
+        const previousEmail = currentEmail;
+        currentEmail = email;
+        
+        showToast("מעביר את הכספת לאימייל החדש... נא להמתין", "warning");
+        try {
+          await syncVaultToCloud();
+          showToast("הכספת הועברה בהצלחה לאימייל החדש!", "success");
+        } catch (err) {
+          currentVault.RecoveryEmail = oldEmail;
+          currentEmail = previousEmail;
+          showToast("העברת הכספת נכשלה. שוחזר האימייל הקודם.", "error");
+        }
+      }
+    }
+
+    // שינוי סיסמת מאסטר
+    async function handleChangePassword(e) {
+      e.preventDefault();
+      const oldP = document.getElementById("oldPassword").value;
+      const newP = document.getElementById("newPassword").value;
+      
+      if (!oldP || !newP) {
+        showToast("נא למלא את כל השדות!", "error");
+        return;
+      }
+      
+      if (newP.length < 4) {
+        showToast("הסיסמה החדשה חייבת להיות באורך 4 תווים לפחות!", "error");
+        return;
+      }
+      
+      try {
+        const salt = new Uint8Array(atob(currentVault.Salt).split("").map(c => c.charCodeAt(0)));
+        const oldKeyCheck = await deriveKey(oldP, salt);
+        
+        const tokenDec = await decryptText(
+          currentVault.VerificationTokenEncrypted,
+          currentVault.VerificationTokenIv,
+          currentVault.VerificationTokenTag,
+          oldKeyCheck
+        );
+        
+        if (tokenDec !== "AUTHENTICATED") {
+          showToast("הסיסמה הנוכחית אינה נכונה!", "error");
+          return;
+        }
+        
+        showToast("מצפין מחדש את הכספת... נא להמתין", "warning");
+        
+        const newSalt = window.crypto.getRandomValues(new Uint8Array(16));
+        const newKey = await deriveKey(newP, newSalt);
+        
+        const tokenEnc = await encryptText("AUTHENTICATED", newKey);
+        const accountsEnc = await encryptText(JSON.stringify(accounts), newKey);
+        
+        currentVault.Salt = btoa(String.fromCharCode(...newSalt));
+        currentVault.VerificationTokenEncrypted = tokenEnc.ciphertext;
+        currentVault.VerificationTokenIv = tokenEnc.iv;
+        currentVault.VerificationTokenTag = tokenEnc.tag;
+        currentVault.AccountsEncrypted = accountsEnc.ciphertext;
+        currentVault.AccountsIv = accountsEnc.iv;
+        currentVault.AccountsTag = accountsEnc.tag;
+        
+        sessionKey = newKey;
+        currentPasswordHash = await sha256(newP);
+        
+        await syncVaultToCloud();
+        
+        document.getElementById("changePasswordForm").reset();
+        showToast("סיסמת המאסטר שונתה בהצלחה!", "success");
+      } catch (err) {
+        showToast("כשל בעדכון הסיסמה: " + err.message, "error");
+      }
+    }
+
+    // ייצוא נתונים מוצפנים לקובץ JSON
+    function exportData() {
+      if (!sessionKey || !currentVault) return;
+      
+      const jsonString = JSON.stringify(currentVault, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Master_Authenticator_Backup_\${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast("קובץ הגיבוי המוצפן נוצר והורד בהצלחה! 📥", "success");
+    }
+
+    // טריגר העלאת קובץ ייבוא
+    function triggerImport() {
+      document.getElementById("importFileInput").click();
+    }
+
+    // ייבוא נתונים מקובץ JSON
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          
+          if (!data.Salt || !data.VerificationTokenEncrypted || !data.AccountsEncrypted) {
+            showToast("מבנה קובץ הגיבוי לא חוקי!", "error");
+            return;
+          }
+          
+          const confirmImport = confirm("ייבוא קובץ זה יחליף לחלוטין את כל החשבונות הנוכחיים במכשיר זה. האם להמשיך?");
+          if (!confirmImport) return;
+          
+          const backupPassword = prompt("אנא הזן את סיסמת המאסטר של קובץ הגיבוי:");
+          if (!backupPassword) return;
+          
+          const salt = new Uint8Array(atob(data.Salt).split("").map(c => c.charCodeAt(0)));
+          const key = await deriveKey(backupPassword, salt);
+          
+          try {
+            const tokenDec = await decryptText(
+              data.VerificationTokenEncrypted,
+              data.VerificationTokenIv,
+              data.VerificationTokenTag,
+              key
+            );
+            
+            if (tokenDec === "AUTHENTICATED") {
+              sessionKey = key;
+              currentVault = data;
+              currentPasswordHash = await sha256(backupPassword);
+              
+              const accountsJson = await decryptText(
+                data.AccountsEncrypted,
+                data.AccountsIv,
+                data.AccountsTag,
+                key
+              );
+              accounts = JSON.parse(accountsJson);
+              
+              showToast("הגיבוי יובא בהצלחה! מסנכרן לענן...", "success");
+              renderAccounts();
+              
+              await syncVaultToCloud();
+            } else {
+              showToast("סיסמת הגיבוי שגויה!", "error");
+            }
+          } catch (decErr) {
+            showToast("סיסמת הגיבוי שגויה או שקובץ הגיבוי פגום!", "error");
+          }
+        } catch (err) {
+          showToast("כשל בקריאת קובץ הגיבוי: " + err.message, "error");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // התנתקות ואיפוס סשן בזיכרון
+    function resetWholeSystem() {
+      const confirmReset1 = confirm("⚠️ האם אתה בטוח שברצונך להתנתק ולמחוק את נתוני הסשן הנוכחי בזיכרון?");
+      if (!confirmReset1) return;
+      
+      sessionKey = null;
+      accounts = [];
+      currentVault = null;
+      currentEmail = "";
+      currentPasswordHash = "";
+      if (totpInterval) clearInterval(totpInterval);
+      if (countdownInterval) clearInterval(countdownInterval);
+      
+      showToast("התנתקת בהצלחה מהמערכת.", "info");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
+  </script>
+
+</body>
+</html>
